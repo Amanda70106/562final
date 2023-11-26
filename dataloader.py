@@ -1,7 +1,14 @@
-from torchvision.datasets import Food101
-
-def getTrainDataset(transform):
-    dataset = Food101(
+from torchvision import datasets
+from torchvision import transforms
+# print(dir(datasets))
+def get_dataset(transform):
+    train_set = datasets.Food101(
         root="./Data", download=True, transform=transform
+        , split="train"
     )
-    return dataset
+    val_set = datasets.Food101(
+        root="./Data", download=True, transform=transform
+        , split="test"
+    )
+    return train_set, val_set
+

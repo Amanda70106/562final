@@ -4,7 +4,7 @@ import shutil
 
 def transform_dataset(input_path, output_path):
     # Read metadata file
-    metadata_path = os.path.join(input_path, 'meta', 'train.json')
+    metadata_path = os.path.join(input_path, 'meta', 'test.json')
 
     with open(metadata_path, 'r') as metadata_file:
         metadata = json.load(metadata_file)
@@ -26,7 +26,8 @@ def transform_dataset(input_path, output_path):
             shutil.copyfile(old_image_path, new_image_path)
 
 # Example usage
-input_dataset_path = './Data/food-101/food-101'
-output_dataset_path = './Data/food-101-imageFolder'
+folder_path = os.path.join(os.path.dirname(__file__), "Data", "food-101")
+input_dataset_path = os.path.join(os.path.dirname(__file__), "Data", "food-101")
+output_dataset_path = os.path.join(os.path.dirname(__file__), "Data", "food-101-ImageFolder")
 
 transform_dataset(input_dataset_path, output_dataset_path)

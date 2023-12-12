@@ -1,6 +1,5 @@
 import torch
 from PIL import Image
-import numpy
 import sys
 from torchvision import transforms
 import numpy as np
@@ -13,17 +12,7 @@ def rollout(attentions, discard_ratio, head_fusion):
     result = torch.eye(attentions[0].size(-1))
     with torch.no_grad():
         for attention in attentions:
-            if head_fusion == "mean":
-                attention_heads_fused = attentions[-1].mean(axis=1)
-            elif head_fusion == "max":
-                attention_heads_fused = attention.max(axis=1)[0]
-            elif head_fusion == "min":
-                attention_heads_fused = attention.min(axis=1)[0]
-            else:
-                raise "Attention head fusion type Not supported"
-
-            # Drop the lowest attentions, but
-            # don't drop the class token
+            attention_heads_fused = attention.mean(axis=1)
             flat = attention_heads_fused.view(attention_heads_fused.size(0), -1)
             _, indices = flat.topk(int(flat.size(-1)*discard_ratio), -1, False)
             indices = indices[indices != 0]
@@ -35,10 +24,8 @@ def rollout(attentions, discard_ratio, head_fusion):
 
             result = torch.matmul(a, result)
     
-    # Look at the total attention between the class token,
-    # and the image patches
+
     mask = result[0, 0 , 1 :]
-    # In case of 224x224 image, this brings us from 196 to 14
     width = int(mask.size(-1)**0.5)
     mask = mask.reshape(width, width).numpy()
     mask = mask / np.max(mask)
@@ -90,7 +77,6 @@ class VITAttentionRollout:
                             'Spaghetti carbonara', 'Spring rolls', 'Steak', 'Strawberry shortcake', 
                             'Sushi', 'Tacos', 'Takoyaki', 'Tiramisu', 'Tuna tartare', 'Waffles'], 
                             images=image, return_tensors="pt", padding=True)
-            # input = processor(text=["a dog", "a plane"], images=image, return_tensors="pt", padding=True)
             with torch.no_grad():
                 output = self.model(**input)
                 self.attentions = output.vision_model_output.attentions
@@ -101,36 +87,8 @@ class VITAttentionRollout:
 
         return rollout(self.attentions, self.discard_ratio, self.head_fusion)
     
-import argparse
-import sys
-import torch
-from PIL import Image
-from torchvision import transforms
-import numpy as np
-import cv2
 
 
-def get_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--use_cuda', action='store_true', default=False,
-                        help='Use NVIDIA GPU acceleration')
-    parser.add_argument('--image_path', type=str, default='./examples/both.png',
-                        help='Input image path')
-    parser.add_argument('--head_fusion', type=str, default='max',
-                        help='How to fuse the attention heads for attention rollout. \
-                        Can be mean/max/min')
-    parser.add_argument('--discard_ratio', type=float, default=0.9,
-                        help='How many of the lowest 14x14 attention paths should we discard')
-    parser.add_argument('--category_index', type=int, default=None,
-                        help='The category index for gradient rollout')
-    args = parser.parse_args()
-    args.use_cuda = args.use_cuda and torch.cuda.is_available()
-    if args.use_cuda:
-        print("Using GPU")
-    else:
-        print("Using CPU")
-
-    return args
 
 def show_mask_on_image(img, mask):
     img = np.float32(img) / 255
@@ -141,33 +99,21 @@ def show_mask_on_image(img, mask):
     return np.uint8(255 * cam)
 
 if __name__ == '__main__':
-    args = get_args()
     # model = torch.hub.load('facebookresearch/deit:main', 
     #     'deit_tiny_patch16_224', pretrained=True)
     # model.eval()
     model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32", output_attentions=True)
-    # if args.use_cuda:
-    #     model = model.cuda()
 
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
-    ])
     img_path = os.path.join(os.path.dirname(__file__), "Data", "food-101", "images", "apple_pie", "280007.jpg")
     # img_path = os.path.join(os.path.dirname(__file__), "plane.png")
     print(img_path)
     img = Image.open(img_path)
     img = img.resize((224, 224))
-    # input_tensor = transform(img).unsqueeze(0)
-    # if args.use_cuda:
-    #     input_tensor = input_tensor.cuda()
 
     print("Doing Attention Rollout")
-    attention_rollout = VITAttentionRollout(model, head_fusion=args.head_fusion, 
-        discard_ratio=args.discard_ratio)
+    attention_rollout = VITAttentionRollout(model)
     mask = attention_rollout(img, "CLIP")
-    name = "attention_rollout_{:.3f}_{}.png".format(args.discard_ratio, args.head_fusion)
+    name = "attention_rollout_{:.3f}_{}.png".format(0.9, "mean")
 
 
 

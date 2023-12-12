@@ -5,5 +5,6 @@ result = []
 with open(img_path, 'r') as file:
     for line in file:
         line = line.strip()
-        result.append(line)
+        line = line.replace(" ", "_")
+        result.append(line.lower())
 print(result)
